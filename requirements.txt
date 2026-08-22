@@ -1,0 +1,45 @@
+
+# core dependencies
+shap
+python-dotenv
+imblearn
+xhtml2pdf
+flask>=2.0.0
+flask_mail
+
+# flask-restful
+flask-cors>=3.0.10
+flask-sqlalchemy>=2.5.1
+flask-migrate>=3.1.0
+flask-jwt-extended>=3.25.0
+# database dependencies
+psycopg2-binary>=2.9.1  # PostgreSQL adapter
+fpdf
+#  fpdf-1.7.2
+# testing dependencies
+pytest>=6.2.4
+pytest-flask>=1.2.0     
+
+xlrd #for xls files
+flask-mail
+weasyprint
+numpy
+
+# development dependencies
+# black>=21.7b0  
+ # code formatter
+pandas
+# documentation dependencies
+# sphinx>=4.2.0
+joblib
+openpyxl
+matplotlib
+# data processing and visualization
+scikit-learn>=0.24.2
+# machine learning dependencies
+scipy>=1.6.2        
+# scientific computing dependencies
+requests>=2.25.1    
+# HTTP library
+
+# additional utilities

@@ -1,0 +1,56 @@
+static/
+.env
+.venv
+main_BKP!.py
+main123.py
+mainworking.py
+tempCodeRunnerFile.py
+data/
+downloads/
+models/
+myenv/
+.venv/
+=
+outputs/
+uploads/
+static/
+utils11/
+app/templates/batch_latenghtworking.html
+app/templates/batch_result.html
+app/templates/batch12.html
+app/templates/batch123.html
+app/templates/batch345.html
+app/templates/column_selector.html
+app/templates/index123.html
+app/templates/extraroutes.py
+app/templates/format_select.html
+app/templates/from curses import flash.py
+app/templates/from flask import Flask, render_template.py
+app/templates/import os.py
+app/templates/import uuid.py
+templtes/result_template1.html
+app/templates/Untitled-2.html
+app/templates/Untitled-3.html
+app/templates/Untitled-7.py
+app/templates/result_template1.html
+dataset_with_generated_target.csv
+batch_output.csv
+newfeatureengfor upload.txt
+prevmain.py
+sample_batch_input_20250714_234444.csv
+sample_batch_input.csv
+tempCodeRunnerFile.python
+testresultslearning.txt
+testresultsof codeinoreoprocess.txt
+src/feature_engineering.py
+src/feature_engineering123.py
+src/feature_engineering_PREV.py
+src/prediction_service1.py
+src/prediction_service123.py
+src/tempCodeRunnerFile.py
+src/testibng.py
+newfeatureengfor upload.txt
+app/__pycache__/__init__.cpython-310.pyc
+__pycache__/
+*.pyc
+.vscode/

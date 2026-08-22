@@ -1,0 +1,102 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>Default Risk Visualization</title>
+</head>
+<body>
+    <h1>Upload CSV for Risk Visualization</h1>
+    <form method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" required><br><br>
+        <button type="submit">Generate Chart</button>
+    </form>
+
+    {% if graph_url %}
+        <h2>Risk Distribution</h2>
+        <img src="{{ graph_url }}" alt="Risk Distribution Chart">
+    {% endif %}
+    <p><a href="/">Back to Home</a></p>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Risk Distribution Visualization</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
+        .navbar {
+            background-color: #2c3e50;
+            overflow: hidden;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: flex-start;
+            gap: 5px; /* Controls spacing between items */
+        }
+
+        .navbar a {
+            color: white;
+            padding: 5px 10px;
+            text-decoration: none;
+            font-size: 16px;
+            display: inline-block;
+        }
+
+        .navbar a:hover {
+            background-color: #1abc9c;
+            color: white;
+        }
+        .container { width: 90%; max-width: 800px; margin: 50px auto; background: #fff; padding: 30px 40px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); text-align: center; }
+        h1 { color: #34495e; }
+        input[type="file"] { width: 100%; margin-top: 15px; }
+        button { margin-top: 20px; padding: 10px 25px; background-color: #1abc9c; border: none; color: white; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #16a085; }
+        img { margin-top: 30px; max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="/">Single Prediction</a>
+        <a href="/batch">Batch Prediction</a>
+        <a href="/train">Train Model</a>
+        <a href="/version">Version Info</a>
+        <a href="/visual">Visualize Risk</a>
+    </div>
+
+    <div class="container">
+        <h1>Visualize Default Risk Distribution</h1>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".csv" required>
+            <button type="submit">Generate Graph</button>
+        </form>
+
+        {% if graph_url %}
+            <img src="{{ graph_url }}" alt="Risk Distribution Graph">
+        {% endif %}
+    </div>
+</body>
+</html>
+    <!-- </div>
+
+    <div class="container">
+        <h1>Single Credit Card Default Prediction</h1>
+        <form method="POST">
+            <label for="credit_limit">Credit Limit:</label>
+            <input type="text" id="credit_limit" name="credit_limit" required>
+
+            <label for="balance">Balance:</label>
+            <input type="text" id="balance" name="balance" required>
+
+            <label for="income">Income:</label>
+            <input type="text" id="income" name="income" required>
+
+            <button type="submit">Predict Default Risk</button>
+        </form>
+
+        {% if result %}
+            <div class="result">
+                Prediction Result: {{ result }}
+            </div>
+        {% endif %}
+    </div> -->

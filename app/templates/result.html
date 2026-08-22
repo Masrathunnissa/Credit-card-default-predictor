@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prediction Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5">
+    <h2>Prediction Completed</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if download_link %}
+        <div class="alert alert-info">
+            <p>Your prediction results are ready:</p>
+            <a href="{{ url_for('download_file', filename=download_link) }}" class="btn btn-primary">Download Results</a>
+        </div>
+    {% endif %}
+
+    {% if email_sent %}
+        <div class="alert alert-success">
+            <p>✅ Results were sent to {{ email }}.</p>
+        </div>
+    {% endif %}
+
+    {% if email_error %}
+        <div class="alert alert-danger">
+            <p>❌ Failed to send email: {{ email_error }}</p>
+        </div>
+    {% endif %}
+
+</div>
+</body>
+</html>
