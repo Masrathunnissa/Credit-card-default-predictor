@@ -1,0 +1,31 @@
+
+# following needs to be added into the train admin page/section on ui
+#Check statistical measures of the data
+df.describe().T
+#Check Duplicate Values
+df.duplicated().sum()
+#Check unique values
+df.nunique()
+#Draw heatmap
+correlation_matrix = df.corr()
+plt.figure(figsize=(12, 8))
+sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.show()
+payment_history_columns = ['PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6']
+
+for col in payment_history_columns:
+    sns.countplot(x=col, hue='default.payment.next.month', data=df)
+    plt.title(f'Default vs. {col}')
+    plt.show()
+
+#Check Feature Importance
+feature_importance = pd.Series(model.coef_[0], index=X.columns)
+feature_importance = feature_importance.abs().sort_values(ascending=False)
+print("Feature Importance:")
+print(feature_importance)
+
+# accuracy comparision of all models
+cla = LazyClassifier(verbose=0,ignore_warnings=True, custom_metric=None)
+models,predictions = cla.fit(X_train, X_test, y_train, y_test)
+models
