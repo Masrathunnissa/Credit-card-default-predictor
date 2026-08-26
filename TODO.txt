@@ -1,5 +1,5 @@
 
-# following needs to be added into the train admin page/section on ui
+# following needs to be added into the train section on ui to be done when after running the recent batch-prediction and results generated then when user clicks view analysis result buton on Train section.
 #Check statistical measures of the data
 df.describe().T
 #Check Duplicate Values
@@ -25,7 +25,8 @@ feature_importance = feature_importance.abs().sort_values(ascending=False)
 print("Feature Importance:")
 print(feature_importance)
 
-# accuracy comparision of all models
+# accuracy comparision of all models only to be done when after running the recent batch-prediction and results generated then when user clicks on start Training button on ui under Train Model section
+
 cla = LazyClassifier(verbose=0,ignore_warnings=True, custom_metric=None)
 models,predictions = cla.fit(X_train, X_test, y_train, y_test)
 models
