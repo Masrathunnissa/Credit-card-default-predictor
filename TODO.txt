@@ -1,5 +1,6 @@
 
-# following needs to be added into the train section on ui to be done when after running the recent batch-prediction and results generated then when user clicks view analysis result buton on Train section.
+#DONE-completed 
+#following needs to be added into the train section on ui to be done when after running the recent batch-prediction and results generated then when user clicks view analysis result buton on Train section.
 #Check statistical measures of the data
 df.describe().T
 #Check Duplicate Values
