@@ -139,7 +139,7 @@ For future changes:
 git status
 git add .
 git commit -m "Describe your changes"
-git push
+git push or git push --set-upstream origin feature/modelfearureeng
 
 Important Notes
 
