@@ -890,6 +890,165 @@ def save_shap_plot_as_png(model, input_scaled, shap_plot_path, X_train_scaled=No
     plt.close()
     print(f"✅ SHAP plot saved at: {shap_plot_path}")
 
+
+def save_batch_pdf(pdf_path, results, original_rows=0, processed_rows=0, output_format="csv"):
+    """
+    Save batch prediction results as a PDF report.
+    
+    Args:
+        pdf_path: Path to save the PDF file
+        results: List of prediction result dictionaries
+        original_rows: Number of original rows in uploaded file
+        processed_rows: Number of rows after preprocessing
+        output_format: Format of output (csv, pdf, xlsx, etc.)
+    """
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=12)
+        
+        # Header
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(200, 10, txt="Credit Card Default Batch Prediction Report", ln=True, align='C')
+        
+        pdf.ln(5)
+        
+        pdf.set_font("Arial", '', 10)
+        pdf.cell(200, 8, txt=f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
+        pdf.cell(200, 8, txt="_"*90, ln=True, align='C')
+        
+        pdf.ln(5)
+        
+        # Summary Section
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 8, txt="Batch Processing Summary", ln=True)
+        
+        pdf.set_font("Arial", '', 10)
+        pdf.cell(200, 7, txt=f"  - Original Records: {original_rows}", ln=True)
+        pdf.cell(200, 7, txt=f"  - Processed Records: {processed_rows}", ln=True)
+        pdf.cell(200, 7, txt=f"  - Output Format: {output_format.upper()}", ln=True)
+        pdf.cell(200, 7, txt=f"  - Total Predictions: {len(results)}", ln=True)
+        
+        # Count defaults
+        defaults_count = sum(1 for r in results if r.get('Prediction') == 'Default')
+        no_defaults_count = len(results) - defaults_count
+        pdf.cell(200, 7, txt=f"  - Records with Default Risk: {defaults_count}", ln=True)
+        pdf.cell(200, 7, txt=f"  - Records with No Default Risk: {no_defaults_count}", ln=True)
+        
+        pdf.ln(5)
+        pdf.cell(200, 8, txt="_"*90, ln=True, align='C')
+        pdf.ln(5)
+        
+        # Detailed Results Section (First 50 rows)
+        pdf.set_font("Arial", 'B', 11)
+        pdf.cell(200, 8, txt="Detailed Prediction Results (First 50 records)", ln=True)
+        
+        pdf.set_font("Arial", '', 9)
+        pdf.ln(3)
+        
+        # Display first 50 results
+        for i, result in enumerate(results[:50]):
+            line = f"{result.get('Row', i+1)}. Pred: {result.get('Prediction', 'N/A')} | Prob: {result.get('Probability', 'N/A')}"
+            if 'ID' in result:
+                line += f" | ID: {result['ID']}"
+            pdf.cell(200, 5, txt=line[:95], ln=True)
+        
+        if len(results) > 50:
+            pdf.set_font("Arial", 'I', 9)
+            pdf.cell(200, 6, txt=f"... and {len(results) - 50} more records (see attached CSV/PDF file)", ln=True)
+        
+        pdf.ln(5)
+        pdf.cell(200, 8, txt="_"*90, ln=True, align='C')
+        pdf.ln(5)
+        
+        # Footer Info
+        pdf.set_font("Arial", '', 9)
+        pdf.multi_cell(190, 5, txt="For complete results, please refer to the attached predictions file in your selected output format (CSV/PDF).\n\n"
+            "Disclaimer: These predictions are based on historical patterns and should be used as guidance only. "
+            "They do not guarantee future outcomes.")
+        
+        pdf.ln(3)
+        pdf.set_font("Arial", 'I', 8)
+        pdf.cell(200, 6, txt="@2026 Credit Card Default Prediction System | By Masrath Unnissa", ln=True, align='C')
+        
+        pdf.output(pdf_path)
+        print(f"✅ Batch PDF report saved at: {pdf_path}")
+        return True
+    except Exception as e:
+        print(f"❌ Error saving batch PDF: {e}")
+        return False
+
+
+def save_batch_txt(txt_path, results, original_rows=0, processed_rows=0, output_format="csv"):
+    """
+    Save batch prediction results as a TXT report.
+    
+    Args:
+        txt_path: Path to save the TXT file
+        results: List of prediction result dictionaries
+        original_rows: Number of original rows in uploaded file
+        processed_rows: Number of rows after preprocessing
+        output_format: Format of output (csv, pdf, xlsx, etc.)
+    """
+    try:
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write("=" * 90 + "\n")
+            f.write("CREDIT CARD DEFAULT BATCH PREDICTION REPORT\n")
+            f.write("=" * 90 + "\n\n")
+            
+            f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            # Summary Section
+            f.write("BATCH PROCESSING SUMMARY:\n")
+            f.write("-" * 90 + "\n")
+            f.write(f"  - Original Records: {original_rows}\n")
+            f.write(f"  - Processed Records: {processed_rows}\n")
+            f.write(f"  - Output Format: {output_format.upper()}\n")
+            f.write(f"  - Total Predictions: {len(results)}\n")
+            
+            # Count defaults
+            defaults_count = sum(1 for r in results if r.get('Prediction') == 'Default')
+            no_defaults_count = len(results) - defaults_count
+            f.write(f"  - Records with Default Risk: {defaults_count}\n")
+            f.write(f"  - Records with No Default Risk: {no_defaults_count}\n")
+            f.write(f"  - Default Rate: {(defaults_count/len(results)*100):.2f}%\n")
+            f.write("\n" + "=" * 90 + "\n\n")
+            
+            # Detailed Results Section (First 50 rows)
+            f.write("DETAILED PREDICTION RESULTS (First 50 records):\n")
+            f.write("-" * 90 + "\n")
+            for i, result in enumerate(results[:50]):
+                f.write(f"Row {result.get('Row', i+1)}: ")
+                f.write(f"Prediction={result.get('Prediction', 'N/A')}, ")
+                f.write(f"Probability={result.get('Probability', 'N/A')}")
+                if 'ID' in result:
+                    f.write(f", ID={result['ID']}")
+                f.write("\n")
+            
+            if len(results) > 50:
+                f.write(f"\n... and {len(results) - 50} more records\n")
+            
+            f.write("\n" + "=" * 90 + "\n\n")
+            
+            # Footer Info
+            f.write("NOTES:\n")
+            f.write("-" * 90 + "\n")
+            f.write("For complete results, please refer to the attached predictions file in your selected output format.\n\n")
+            f.write("Prediction Categories:\n")
+            f.write("  - 'Default': Model predicts payment default risk\n")
+            f.write("  - 'No Default': Model predicts no default risk\n")
+            f.write("  - Probability (%): Confidence level of the prediction\n\n")
+            f.write("Disclaimer: These predictions are based on historical patterns and should be used as guidance only.\n")
+            f.write("They do not guarantee future outcomes and should not be the sole basis for decisions.\n\n")
+            f.write("@2026 Credit Card Default Prediction System | By Masrath Unnissa\n")
+            f.write("=" * 90 + "\n")
+        
+        print(f"✅ Batch TXT report saved at: {txt_path}")
+        return True
+    except Exception as e:
+        print(f"❌ Error saving batch TXT: {e}")
+        return False
+
 # input_array = "C:/Users/masra/Desktop/Project/credit-card-prediction/models/run_20250715_232259/preprocessed_data.csv"
 # if __name__ == "__main__":
 #     df=pd.read_csv(input_array)
