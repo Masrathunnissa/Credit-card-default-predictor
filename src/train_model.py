@@ -13,11 +13,64 @@ from datetime import datetime
 
 def train_and_save_model(data_path, save_dir="models"):
     # Load dataset
-    df = pd.read_excel(data_path, header=1)
+    if isinstance(data_path, pd.DataFrame):
+        df = data_path.copy()
+    elif str(data_path).lower().endswith('.csv'):
+        df = pd.read_csv(data_path)
+    else:
+        df = pd.read_excel(data_path, header=1)
 
     # Clean and prepare data
-    df.rename(columns={"default payment next month": "default"}, inplace=True)
-    df.drop("ID", axis=1, inplace=True)
+    df.columns = [str(column).strip() for column in df.columns]
+    target_aliases = {
+        "defaultpaymentnextmonth": "default",
+        "defaultpaymentnextmonth0": "default",
+        "default": "default"
+    }
+    df.rename(
+        columns={
+            column: target_aliases.get(
+                "".join(character for character in str(column).lower() if character.isalnum()),
+                column
+            )
+            for column in df.columns
+        },
+        inplace=True
+    )
+    if "default" not in df.columns and len(df.columns) >= 23:
+        canonical_columns = [
+            "ID", "LIMIT_BAL", "SEX", "EDUCATION", "MARRIAGE", "AGE",
+            "PAY_0", "PAY_2", "PAY_3", "PAY_4", "PAY_5", "PAY_6",
+            "BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4",
+            "BILL_AMT5", "BILL_AMT6", "PAY_AMT1", "PAY_AMT2",
+            "PAY_AMT3", "PAY_AMT4", "default"
+        ]
+        df.columns = canonical_columns + list(df.columns[len(canonical_columns):])
+    df.drop("ID", axis=1, inplace=True, errors="ignore")
+
+    for column in df.columns:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    df.dropna(inplace=True)
+
+    if "default" not in df.columns:
+        required_features = {
+            "LIMIT_BAL", "PAY_0", "PAY_2", "PAY_3", "PAY_4", "PAY_5", "PAY_6",
+            "BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4", "BILL_AMT5", "BILL_AMT6",
+            "PAY_AMT1", "PAY_AMT2", "PAY_AMT3", "PAY_AMT4"
+        }
+        if required_features.issubset(df.columns):
+            serious_delay = df[["PAY_0", "PAY_2", "PAY_3", "PAY_4", "PAY_5", "PAY_6"]].ge(2).any(axis=1)
+            bill_total = df[["BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4", "BILL_AMT5", "BILL_AMT6"]].mean(axis=1)
+            pay_total = df[["PAY_AMT1", "PAY_AMT2", "PAY_AMT3", "PAY_AMT4"]].mean(axis=1)
+            low_payment_ratio = (pay_total / (bill_total + 1e-6)) < 0.2
+            df["default"] = (
+                serious_delay |
+                low_payment_ratio |
+                ((df["LIMIT_BAL"] < 100000) & (df["PAY_0"] > 0))
+            ).astype(int)
+
+    if "default" not in df.columns:
+        raise ValueError("Training data must include a default target column.")
 
     # Features and target
     X = df.drop("default", axis=1)

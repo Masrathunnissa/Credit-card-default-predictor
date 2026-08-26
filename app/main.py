@@ -7,6 +7,7 @@ import base64
 import secrets
 import openpyxl
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request, send_file, redirect, url_for, flash, session, abort
 from werkzeug.utils import secure_filename
@@ -38,6 +39,26 @@ from src.utils.email_service import (
     send_email_with_pdf,
     send_email_with_attachment,
     send_email_with_multiple_attachments
+)
+from src.data_analysis import (
+    analyze_statistical_measures,
+    check_duplicates,
+    check_unique_values,
+    generate_correlation_heatmap,
+    analyze_payment_history,
+    generate_data_quality_report
+)
+from src.feature_importance import (
+    calculate_feature_importance_from_model,
+    plot_feature_importance,
+    generate_feature_importance_report,
+    identify_top_predictive_features
+)
+from src.model_comparison import (
+    compare_models_lazy_classifier,
+    format_models_comparison,
+    plot_models_comparison,
+    get_model_recommendations
 )
 
 # Flask App Setup
@@ -682,18 +703,250 @@ def download_metrics():
 
 @app.route('/train', methods=['GET', 'POST'])
 def train():
+    """
+    Train model and perform comprehensive analysis including:
+    - Statistical analysis
+    - Data quality checks
+    - Correlation analysis
+    - Payment history analysis
+    - Feature importance
+    - Model comparison with LazyClassifier
+    """
+    analysis_results = {}
+    data_loaded = False
+    
     if request.method == 'POST':
-        uploaded_file = request.files['file']
-        if uploaded_file and uploaded_file.filename.endswith(('.csv', '.xls', '.xlsx')):
-            df = pd.read_csv(uploaded_file) if uploaded_file.filename.endswith('.csv') else pd.read_excel(uploaded_file)
-            model_path, accuracy = train_and_save_model(df)
-            # save_model_version_info(model_path, accuracy)
-            flash(f'Model trained successfully! Accuracy: {accuracy:.2f}%', 'success')
+        try:
+            uploaded_file = request.files.get('file')
+            
+            if not uploaded_file or not uploaded_file.filename:
+                flash('Please upload a file.', 'danger')
+                return redirect(url_for('train'))
+            
+            if not uploaded_file.filename.endswith(('.csv', '.xls', '.xlsx')):
+                flash('Please upload a valid file (.csv or .xls/.xlsx)', 'danger')
+                return redirect(url_for('train'))
+            
+            print("📊 Loading data for analysis...")
+            
+            # Load data
+            try:
+                if uploaded_file.filename.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                else:
+                    df = pd.read_excel(uploaded_file)
+            except Exception as e:
+                flash(f'Error loading file: {str(e)}', 'danger')
+                return redirect(url_for('train'))
+            
+            print(f"✅ Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
+            data_loaded = True
+
+            # Keep analysis column names compatible with the training pipeline.
+            analysis_df = df.copy()
+            analysis_df.columns = [str(column).strip() for column in analysis_df.columns]
+            canonical_columns = [
+                'ID', 'LIMIT_BAL', 'SEX', 'EDUCATION', 'MARRIAGE', 'AGE',
+                'PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6',
+                'BILL_AMT1', 'BILL_AMT2', 'BILL_AMT3', 'BILL_AMT4',
+                'BILL_AMT5', 'BILL_AMT6', 'PAY_AMT1', 'PAY_AMT2',
+                'PAY_AMT3', 'PAY_AMT4'
+            ]
+            column_aliases = {
+                ''.join(character for character in column.lower() if character.isalnum()): column
+                for column in canonical_columns
+            }
+            normalized_columns = []
+            for column in analysis_df.columns:
+                key = ''.join(character for character in column.lower() if character.isalnum())
+                normalized_columns.append(column_aliases.get(key, column.replace(' ', '_')))
+            analysis_df.columns = normalized_columns
+            if 'PAY_0' not in analysis_df.columns and len(analysis_df.columns) >= len(canonical_columns):
+                analysis_df.columns = canonical_columns + list(analysis_df.columns[len(canonical_columns):])
+            for column in analysis_df.columns:
+                converted = pd.to_numeric(analysis_df[column], errors='coerce')
+                if converted.notna().any():
+                    analysis_df[column] = converted
+
+            target_aliases = {
+                'default_payment_next_month': 'default',
+                'defaultpaymentnextmonth': 'default',
+                'default.payment.next.month': 'default',
+                'default': 'default'
+            }
+            analysis_df.rename(
+                columns={column: target_aliases[column] for column in analysis_df.columns if column in target_aliases},
+                inplace=True
+            )
+            required_features = {
+                'LIMIT_BAL', 'PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6',
+                'BILL_AMT1', 'BILL_AMT2', 'BILL_AMT3', 'BILL_AMT4', 'BILL_AMT5', 'BILL_AMT6',
+                'PAY_AMT1', 'PAY_AMT2', 'PAY_AMT3', 'PAY_AMT4'
+            }
+            if 'default' not in analysis_df.columns and required_features.issubset(analysis_df.columns):
+                serious_delay = analysis_df[['PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6']].ge(2).any(axis=1)
+                bill_total = analysis_df[['BILL_AMT1', 'BILL_AMT2', 'BILL_AMT3', 'BILL_AMT4', 'BILL_AMT5', 'BILL_AMT6']].mean(axis=1)
+                pay_total = analysis_df[['PAY_AMT1', 'PAY_AMT2', 'PAY_AMT3', 'PAY_AMT4']].mean(axis=1)
+                low_payment_ratio = (pay_total / (bill_total + 1e-6)) < 0.2
+                analysis_df['default'] = (
+                    serious_delay |
+                    low_payment_ratio |
+                    ((analysis_df['LIMIT_BAL'] < 100000) & (analysis_df['PAY_0'] > 0))
+                ).astype(int)
+            
+            # ====================================
+            # 1. DATA QUALITY ANALYSIS
+            # ====================================
+            print("\n📋 Starting data quality analysis...")
+            quality_report = generate_data_quality_report(analysis_df)
+            analysis_results['quality_report'] = quality_report
+            
+            # ====================================
+            # 2. STATISTICAL MEASURES
+            # ====================================
+            print("📈 Calculating statistical measures...")
+            stats_result = analyze_statistical_measures(analysis_df)
+            analysis_results['statistics'] = stats_result
+            
+            # ====================================
+            # 3. DUPLICATE CHECK
+            # ====================================
+            print("🔍 Checking duplicates...")
+            duplicates = check_duplicates(analysis_df)
+            analysis_results['duplicates'] = duplicates
+            
+            # ====================================
+            # 4. UNIQUE VALUES CHECK
+            # ====================================
+            print("🔢 Checking unique values...")
+            unique_values = check_unique_values(analysis_df)
+            analysis_results['unique_values'] = unique_values
+            
+            # ====================================
+            # 5. CORRELATION HEATMAP
+            # ====================================
+            print("🔗 Generating correlation heatmap...")
+            heatmap_result = generate_correlation_heatmap(analysis_df)
+            analysis_results['heatmap'] = heatmap_result
+            
+            # ====================================
+            # 6. PAYMENT HISTORY ANALYSIS
+            # ====================================
+            print("💳 Analyzing payment history...")
+            payment_analysis = analyze_payment_history(analysis_df, target_column='default')
+            analysis_results['payment_analysis'] = payment_analysis
+            
+            # ====================================
+            # 7. FEATURE IMPORTANCE (if model available)
+            # ====================================
+            print("⭐ Analyzing feature importance...")
+            try:
+                from src.prediction_service import model, scaler, fields
+                
+                # Prepare data for model
+                feature_count = getattr(model, 'n_features_in_', len(fields))
+                feature_names = list(fields[:feature_count])
+                if len(feature_names) < feature_count:
+                    feature_names.extend(
+                        f'feature_{index}'
+                        for index in range(len(feature_names), feature_count)
+                    )
+                importance_dict = calculate_feature_importance_from_model(model, feature_names)
+                if importance_dict:
+                    importance_plot = plot_feature_importance(importance_dict, top_n=15)
+                    importance_report = generate_feature_importance_report(importance_dict)
+                    top_features = identify_top_predictive_features(importance_dict, threshold=0.8)
+                    analysis_results['feature_importance'] = {
+                        'plot': importance_plot,
+                        'report': importance_report,
+                        'top_features': top_features
+                    }
+            except Exception as e:
+                print(f"⚠️ Feature importance calculation skipped: {str(e)}")
+            
+            # ====================================
+            # 8. MODEL COMPARISON (LazyClassifier)
+            # ====================================
+            print("\n🤖 Starting model comparison...")
+            try:
+                from sklearn.model_selection import train_test_split
+                
+                # Prepare data
+                numeric_df = analysis_df.select_dtypes(include=[np.number]).copy()
+                if len(numeric_df) > 1:
+                    # Find target column (last column or 'default.payment.next.month')
+                    target_col = None
+                    if 'default' in numeric_df.columns:
+                        target_col = 'default'
+                    else:
+                        # Use last column as target
+                        target_col = numeric_df.columns[-1]
+                    
+                    if target_col in numeric_df.columns:
+                        X = numeric_df.drop(target_col, axis=1)
+                        y = numeric_df[target_col]
+                        
+                        # Split data
+                        X_train, X_test, y_train, y_test = train_test_split(
+                            X, y, test_size=0.2, random_state=42
+                        )
+                        
+                        # Compare models
+                        comparison_result = compare_models_lazy_classifier(
+                            X_train, X_test, y_train, y_test
+                        )
+                        
+                        if comparison_result:
+                            # Format results
+                            formatted = format_models_comparison(comparison_result)
+                            if formatted:
+                                # Generate visualizations
+                                plot_result = plot_models_comparison(formatted, metric='Accuracy', top_n=15)
+                                recommendations = get_model_recommendations(formatted)
+                                
+                                analysis_results['model_comparison'] = {
+                                    'formatted': formatted,
+                                    'plot': plot_result,
+                                    'recommendations': recommendations
+                                }
+                                
+                                print(f"✅ Model comparison completed: {formatted['models_count']} models tested")
+            except ImportError:
+                print("⚠️ LazyClassifier not available. Install: pip install lazypredict")
+                flash('⚠️ LazyClassifier not installed. To use model comparison, run: pip install lazypredict', 'info')
+            except Exception as e:
+                print(f"⚠️ Model comparison skipped: {str(e)}")
+            
+            # ====================================
+            # 9. TRAIN YOUR MAIN MODEL
+            # ====================================
+            print("\n🚀 Training main model...")
+            try:
+                accuracy, report, model_path, scaler_path = train_and_save_model(analysis_df)
+                analysis_results['model_training'] = {
+                    'model_path': model_path,
+                    'accuracy': accuracy
+                }
+                flash(f'✅ Model trained successfully! Accuracy: {accuracy:.2f}%', 'success')
+            except Exception as e:
+                flash(f'Error training model: {str(e)}', 'danger')
+            
+            print("\n✅ All analyses completed!")
+            
+            # Return results to template
+            return render_template(
+                'train.html',
+                data_loaded=True,
+                analysis_results=analysis_results
+            )
+        
+        except Exception as e:
+            print(f"❌ Error during analysis: {str(e)}")
+            traceback.print_exc()
+            flash(f'Error during analysis: {str(e)}', 'danger')
             return redirect(url_for('train'))
-        else:
-            flash("Please upload a valid training dataset file (.csv or .xls/.xlsx)", "error")
-            return redirect(url_for('train'))
-    return render_template('train.html')
+    
+    return render_template('train.html', data_loaded=False, analysis_results={})
 
 @app.route('/version')
 def version():
@@ -710,31 +963,41 @@ def version():
 def visual():
     graph_url = None
     if request.method == 'POST':
-        uploaded_file = request.files['file']
-        if uploaded_file.filename.endswith(('.csv', '.xls', '.xlsx')):
-            df = pd.read_csv(uploaded_file) if uploaded_file.filename.endswith('.csv') else pd.read_excel(uploaded_file)
-            results = []
-            for _, row in df.iterrows():
-                features = row.tolist()
-                _, prob = predict_default(features)
-                results.append(prob)
+        uploaded_file = request.files.get('file')
+        filename = uploaded_file.filename.lower() if uploaded_file else ''
+        if not uploaded_file or not filename:
+            flash('Please select a CSV or Excel file.', 'danger')
+            return redirect(url_for('visual'))
+        if not filename.endswith(('.csv', '.xls', '.xlsx')):
+            flash('Only CSV and Excel files are supported for visualization.', 'danger')
+            return redirect(url_for('visual'))
+
+        try:
+            df = pd.read_csv(uploaded_file) if filename.endswith('.csv') else pd.read_excel(uploaded_file)
+            results = predict_from_dataframe_safe(df)
+            probabilities = [
+                float(str(result['Probability']).rstrip('%'))
+                for result in results
+                if result.get('Probability') is not None
+            ]
+            if not probabilities:
+                raise ValueError('No prediction probabilities were produced.')
 
             plt.figure(figsize=(8, 6))
-            plt.hist(results, bins=10, color='skyblue', edgecolor='black')
+            plt.hist(probabilities, bins=10, color='skyblue', edgecolor='black')
             plt.xlabel('Probability of Default (%)')
             plt.ylabel('Number of Customers')
             plt.title('Default Risk Distribution')
+            plt.tight_layout()
 
-            img = io.BytesIO()
-            plt.savefig(img, format='png')
-            img.seek(0)
-            graph_url = base64.b64encode(img.getvalue()).decode()
-            graph_url = f'data:image/png;base64,{graph_url}'
-        else:
-            flash("Only CSV or Excel files are supported for visualization.", "error")
-            return redirect(url_for('visual'))
-        
-    return render_template('visual.html', graph_url=graph_url)
+            image = io.BytesIO()
+            plt.savefig(image, format='png', dpi=100)
+            plt.close()
+            graph_url = f"data:image/png;base64,{base64.b64encode(image.getvalue()).decode()}"
+        except Exception as error:
+            flash(f'Unable to generate risk visualization: {error}', 'danger')
+
+    return render_template('visuals.html', graph_url=graph_url)
 
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

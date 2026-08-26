@@ -43,3 +43,5 @@ requests>=2.25.1
 # HTTP library
 
 # additional utilities
+seaborn 
+lazypredict
