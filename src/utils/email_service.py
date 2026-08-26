@@ -26,6 +26,80 @@ STATIC_DIR = os.path.join(
     "static"
 )
 
+ENV_FILE = os.path.join(BASE_DIR, ".env")
+
+
+# --------------------------------------------------
+# Load environment variables from .env file
+# --------------------------------------------------
+
+def load_env_file(env_path=ENV_FILE):
+    """
+    Load environment variables from .env file.
+    
+    Args:
+        env_path: Path to .env file
+    
+    Returns:
+        dict: Dictionary of environment variables
+    """
+    env_vars = {}
+    
+    if not os.path.exists(env_path):
+        print(f"⚠️ .env file not found at: {env_path}")
+        return env_vars
+    
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                
+                # Skip comments and empty lines
+                if not line or line.startswith("#"):
+                    continue
+                
+                # Parse KEY=VALUE
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    env_vars[key] = value
+        
+        print(f"✅ Loaded .env file from: {env_path}")
+    
+    except Exception as e:
+        print(f"❌ Error reading .env file: {e}")
+    
+    return env_vars
+
+
+# Load environment variables
+_env_vars = load_env_file()
+
+
+def get_env(key, default=None):
+    """
+    Get environment variable from .env file or system environment.
+    
+    Args:
+        key: Variable name
+        default: Default value if not found
+    
+    Returns:
+        Variable value or default
+    """
+    # First check .env file
+    if key in _env_vars and _env_vars[key]:
+        return _env_vars[key]
+    
+    # Then check system environment variables
+    value = os.environ.get(key)
+    if value:
+        return value
+    
+    # Return default
+    return default
+
 
 # --------------------------------------------------
 # Initialize mail
@@ -34,23 +108,26 @@ STATIC_DIR = os.path.join(
 def init_mail(app):
     """
     Initialize Flask-Mail with the Flask application.
+    Reads configuration from .env file or system environment variables.
     """
 
-    app.config["MAIL_SERVER"] = "smtp.gmail.com"
-    app.config["MAIL_PORT"] = 587
-    app.config["MAIL_USE_TLS"] = True
-    app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USER")
-    app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASS")
+    app.config["MAIL_SERVER"] = get_env("MAIL_SERVER", "smtp.gmail.com")
+    app.config["MAIL_PORT"] = int(get_env("MAIL_PORT", "587"))
+    app.config["MAIL_USE_TLS"] = get_env("MAIL_USE_TLS", "True").lower() == "true"
+    app.config["MAIL_USERNAME"] = get_env("MAIL_USER")
+    app.config["MAIL_PASSWORD"] = get_env("MAIL_PASS")
 
     mail.init_app(app)
 
     print("📧 Mail service initialized")
 
     if not app.config["MAIL_USERNAME"]:
-        print("⚠️ MAIL_USER environment variable is not set.")
+        print("⚠️ MAIL_USER not configured in .env file or environment variables.")
+        print(f"   📝 Please edit: {ENV_FILE}")
 
     if not app.config["MAIL_PASSWORD"]:
-        print("⚠️ MAIL_PASS environment variable is not set.")
+        print("⚠️ MAIL_PASS not configured in .env file or environment variables.")
+        print(f"   📝 Please edit: {ENV_FILE}")
 
 
 # --------------------------------------------------
@@ -72,13 +149,13 @@ def send_email_with_pdf(
     """
 
     try:
-        mail_username = os.environ.get("MAIL_USER")
-        mail_password = os.environ.get("MAIL_PASS")
+        mail_username = get_env("MAIL_USER")
+        mail_password = get_env("MAIL_PASS")
 
         if not mail_username or not mail_password:
             print(
                 "❌ Email not configured. "
-                "Set MAIL_USER and MAIL_PASS environment variables."
+                f"Please configure MAIL_USER and MAIL_PASS in: {ENV_FILE}"
             )
             return False
 
@@ -185,13 +262,13 @@ def send_email_with_attachment(
     """
 
     try:
-        mail_username = os.environ.get("MAIL_USER")
-        mail_password = os.environ.get("MAIL_PASS")
+        mail_username = get_env("MAIL_USER")
+        mail_password = get_env("MAIL_PASS")
 
         if not mail_username or not mail_password:
             print(
                 "❌ Email not configured. "
-                "Set MAIL_USER and MAIL_PASS environment variables."
+                f"Please configure MAIL_USER and MAIL_PASS in: {ENV_FILE}"
             )
             return False
 
@@ -240,6 +317,129 @@ def send_email_with_attachment(
 
         print(
             f"✅ Email successfully sent to {to_email}"
+        )
+
+        return True
+
+    except Exception as e:
+
+        print(
+            f"❌ Email sending failed: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        return False
+
+
+# --------------------------------------------------
+# Send email with multiple file attachments
+# --------------------------------------------------
+
+def send_email_with_multiple_attachments(
+    to_email,
+    subject,
+    body,
+    file_paths
+):
+    """
+    Send an email with multiple file attachments.
+    
+    Args:
+        to_email: Recipient email address
+        subject: Email subject
+        body: Email body text
+        file_paths: List of file paths to attach
+                   Can be dict with {file_path: filename_for_email}
+                   or just list of file paths
+    
+    Returns:
+        True if successful, False otherwise
+    """
+
+    try:
+        mail_username = get_env("MAIL_USER")
+        mail_password = get_env("MAIL_PASS")
+
+        if not mail_username or not mail_password:
+            print(
+                "❌ Email not configured. "
+                f"Please configure MAIL_USER and MAIL_PASS in: {ENV_FILE}"
+            )
+            return False
+
+        if not to_email:
+            print("❌ Recipient email is empty.")
+            return False
+
+        msg = Message(
+            subject=subject,
+            sender=mail_username,
+            recipients=[to_email]
+        )
+
+        msg.body = body
+        msg.html = body.replace("\n", "<br>")
+
+        # ------------------------------------------
+        # Attach multiple files
+        # ------------------------------------------
+
+        attached_count = 0
+
+        # Handle both list and dict formats
+        if isinstance(file_paths, dict):
+            files_to_attach = file_paths.items()
+        else:
+            files_to_attach = [(fp, os.path.basename(fp)) for fp in file_paths]
+
+        for file_path, display_filename in files_to_attach:
+            if not os.path.exists(file_path):
+                print(f"⚠️ File not found: {file_path}")
+                continue
+
+            # Determine content type based on extension
+            ext = os.path.splitext(file_path)[1].lower()
+
+            if ext == ".csv":
+                content_type = "text/csv"
+            elif ext == ".pdf":
+                content_type = "application/pdf"
+            elif ext == ".txt":
+                content_type = "text/plain"
+            elif ext in [".png", ".jpg", ".jpeg", ".gif"]:
+                content_type = f"image/{ext.strip('.')}"
+            elif ext == ".xlsx":
+                content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            elif ext == ".xls":
+                content_type = "application/vnd.ms-excel"
+            else:
+                content_type = "application/octet-stream"
+
+            try:
+                with open(file_path, "rb") as f:
+                    msg.attach(
+                        filename=display_filename,
+                        content_type=content_type,
+                        data=f.read()
+                    )
+                print(f"📎 Attached: {display_filename} ({os.path.getsize(file_path) / 1024:.1f} KB)")
+                attached_count += 1
+            except Exception as e:
+                print(f"⚠️ Failed to attach {file_path}: {e}")
+                continue
+
+        if attached_count == 0:
+            print("⚠️ No files were successfully attached.")
+
+        # ------------------------------------------
+        # Send
+        # ------------------------------------------
+
+        mail.send(msg)
+
+        print(
+            f"✅ Email successfully sent to {to_email} "
+            f"with {attached_count} attachment(s)"
         )
 
         return True

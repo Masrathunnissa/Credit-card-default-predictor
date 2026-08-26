@@ -29,12 +29,15 @@ from src.prediction_service import (
     predict_default,
     predict_from_dataframe_safe,
     save_results_to_csv,
-    save_results_to_pdf
+    save_results_to_pdf,
+    save_batch_pdf,
+    save_batch_txt
 )
 from src.utils.email_service import (
     init_mail,
     send_email_with_pdf,
-    send_email_with_attachment
+    send_email_with_attachment,
+    send_email_with_multiple_attachments
 )
 
 # Flask App Setup
@@ -410,44 +413,127 @@ def run_prediction():
         # return send_file(output_file, as_attachment=True)
         flash('Prediction completed , File is ready.', 'success')
         
-        # Send results via email if provided
+        # Send results via email if provided - WITH ALL ATTACHMENTS
         email_sent = False
         if email:
-            email_subject = "Credit Card Batch Prediction Results"
-            email_body = f"""
+            email = email.strip()
+            if email:  # Double check email is not empty
+                # Collect ALL files to attach
+                files_to_attach = {}
+                
+                # 1. Add predictions results file (CSV or PDF)
+                predictions_file = os.path.join(DOWNLOADS_FOLDER, filename)
+                if os.path.exists(predictions_file):
+                    files_to_attach[predictions_file] = f"batch_predictions_results.{output_format}"
+                
+                # 2. Add all files from run_dir if it exists
+                run_dir = session.get('run_dir')
+                if run_dir and os.path.exists(run_dir):
+                    print(f"🔍 Collecting files from run_dir: {run_dir}")
+                    
+                    for filename_in_dir in os.listdir(run_dir):
+                        file_path = os.path.join(run_dir, filename_in_dir)
+                        
+                        # Skip directories and pickle files
+                        if os.path.isdir(file_path) or filename_in_dir.endswith('.pkl'):
+                            continue
+                        
+                        # Add file with renamed display name for clarity
+                        if 'preprocessed_data' in filename_in_dir:
+                            display_name = "preprocessed_data.csv"
+                        elif 'model_metrics' in filename_in_dir:
+                            display_name = "model_metrics_report.txt"
+                        elif 'roc_curve' in filename_in_dir:
+                            display_name = "roc_curve.png"
+                        elif 'precision_recall' in filename_in_dir:
+                            display_name = "precision_recall_curve.png"
+                        elif 'metrics_report' in filename_in_dir:
+                            display_name = "detailed_metrics_report.html"
+                        else:
+                            display_name = filename_in_dir
+                        
+                        files_to_attach[file_path] = display_name
+                        print(f"  ✅ Added: {display_name}")
+                
+                # 3. Prepare comprehensive email
+                email_subject = "Credit Card Batch Prediction - Complete Results & Reports"
+                email_body = f"""
 Dear User,
 
-Your batch prediction analysis is complete!
+Your batch prediction analysis is complete! 
 
-BATCH SUMMARY:
-- Original Records: {original_shape[0]}
-- Processed Records: {processed_shape[0]}
-- Output Format: {output_format.upper()}
+BATCH PROCESSING SUMMARY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Original Records Uploaded: {original_shape[0]}
+• Processed Records: {processed_shape[0]}
+• Output Format: {output_format.upper()}
+• Total Predictions: {len(results)}
 
-Your batch predictions file is attached to this email.
+ATTACHMENTS INCLUDED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-You can also download the results directly from the platform.
+📊 PREDICTIONS & DATA:
+  • batch_predictions_results.{output_format} - All {len(results)} predictions with probabilities
+  • preprocessed_data.csv - Your processed data (all {processed_shape[0]} records)
+
+📈 MODEL PERFORMANCE REPORTS:
+  • model_metrics_report.txt - Confusion matrix and classification metrics
+  • roc_curve.png - ROC (Receiver Operating Characteristic) curve
+  • precision_recall_curve.png - Precision-Recall curve
+  • detailed_metrics_report.html - Interactive metrics dashboard (open in browser)
+
+PREDICTION RESULTS BREAKDOWN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+                
+                # Calculate statistics
+                defaults_count = sum(1 for r in results if r.get('Prediction') == 'Default')
+                no_defaults_count = len(results) - defaults_count
+                default_rate = (defaults_count / len(results) * 100) if results else 0
+                
+                email_body += f"""
+  • Default Risk Records: {defaults_count} ({default_rate:.2f}%)
+  • No Default Risk Records: {no_defaults_count} ({100-default_rate:.2f}%)
+
+HOW TO USE THESE FILES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. batch_predictions_results.{output_format}: Open with Excel/spreadsheet app to view all predictions
+2. preprocessed_data.csv: View your cleaned and normalized data
+3. ROC & PR Curves: Use to assess model performance
+4. Metrics Report: Detailed performance indicators (Accuracy, Precision, Recall, F1-Score)
+5. HTML Dashboard: Open in web browser for interactive visualization
+
+NEXT STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Review the predictions in the attached CSV/PDF
+✅ Check the model performance in the attached reports
+✅ Contact support if you have questions about the results
+✅ Use these insights for your credit risk assessment decisions
 
 For questions or concerns, please contact support.
 
 Best regards,
 Credit Card Default Prediction System
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@2026 Credit Card Default Prediction System | By Masrath Unnissa
 """
-            email_filename = filename
-            file_path = os.path.join(DOWNLOADS_FOLDER, email_filename)
-            
-            sent = send_email_with_attachment(
-                to_email=email,
-                subject=email_subject,
-                body=email_body,
-                file_path=file_path,
-                filename=email_filename
-            )
-            if sent:
-                email_sent = True
-                flash(f"✅ Results sent successfully to {email}!", "success")
-            else:
-                flash("⚠️ Could not send email. Email configuration may not be set up properly.", "warning")
+                
+                # 4. Send email with ALL attachments
+                if files_to_attach:
+                    sent = send_email_with_multiple_attachments(
+                        to_email=email,
+                        subject=email_subject,
+                        body=email_body,
+                        file_paths=files_to_attach
+                    )
+                    if sent:
+                        email_sent = True
+                        num_attachments = len(files_to_attach)
+                        flash(f"✅ Complete results sent to {email} with {num_attachments} attachment(s)!", "success")
+                    else:
+                        flash("⚠️ Could not send email. Email configuration may not be set up properly.", "warning")
+                else:
+                    flash("⚠️ No files available to email.", "warning")
         
         # return render_template('batch.html',  prediction_done=True, filename=os.path.basename(output_path), run_id=encoded_run_dir, filename='prediction_result.csv')#make batch have result and form select html changes
         return render_template(
