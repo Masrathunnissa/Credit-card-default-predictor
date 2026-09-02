@@ -2,66 +2,347 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Train Model</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Model & Comprehensive Analysis</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
-        .navbar {
-            background-color: #2c3e50;
-            overflow: hidden;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: flex-start;
-            gap: 5px; /* Controls spacing between items */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding-top: 20px; }
+        .navbar { background-color: #2c3e50; overflow: hidden; padding: 12px 20px; display: flex; justify-content: flex-start; gap: 5px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .navbar a { color: white; padding: 8px 15px; text-decoration: none; font-size: 14px; display: inline-block; border-radius: 5px; transition: all 0.3s ease; }
+        .navbar a:hover { background-color: #1abc9c; color: white; transform: translateY(-2px); }
+        .container-main { width: 95%; max-width: 1400px; margin: 0 auto 40px; background: white; border-radius: 12px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); padding: 40px; }
+        h1 { color: #2c3e50; margin-bottom: 30px; text-align: center; font-size: 2.5em; font-weight: 700; }
+        h2 { color: #34495e; margin-top: 30px; margin-bottom: 20px; font-size: 1.8em; border-bottom: 3px solid #1abc9c; padding-bottom: 10px; }
+        h3 { color: #5d6d7b; margin-top: 20px; margin-bottom: 15px; font-size: 1.3em; }
+        .upload-section { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 10px; margin-bottom: 30px; text-align: center; color: white; }
+        .upload-section form { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .upload-section input[type="file"] { padding: 10px; border: 2px solid white; border-radius: 5px; background: rgba(255, 255, 255, 0.1); color: white; max-width: 400px; }
+        .upload-section button { background-color: #1abc9c; border: none; color: white; font-size: 16px; font-weight: bold; padding: 12px 40px; border-radius: 5px; cursor: pointer; transition: all 0.3s ease; max-width: 300px; }
+        .upload-section button:hover { background-color: #16a085; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .alert { margin-bottom: 20px; padding: 15px 20px; border-radius: 8px; font-weight: 500; }
+        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .analysis-section { margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1abc9c; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); text-align: center; }
+        .stat-card h4 { color: #1abc9c; font-size: 0.9em; margin-bottom: 10px; text-transform: uppercase; }
+        .stat-card p { font-size: 1.8em; color: #2c3e50; font-weight: bold; margin: 0; }
+        .table-container { width: 100%; overflow-x: auto; margin: 20px 0; border-radius: 8px; background: white; }
+        .table-container table { width: 100%; min-width: 680px; margin: 0; border-collapse: collapse; table-layout: auto; }
+        .table-container th, .table-container td { padding: 10px 12px; border: 1px solid #dee2e6; vertical-align: middle; text-align: left; line-height: 1.35; }
+        .table-container th { white-space: nowrap; background-color: #1abc9c; color: white; font-weight: 600; }
+        .table-container td { color: #2c3e50; overflow-wrap: anywhere; }
+        .table-container tbody tr:nth-child(even) { background-color: #f8fbfb; }
+        .table-container tbody tr:hover { background-color: #f0f8f8; }
+        .table-container td:first-child, .table-container th:first-child { font-weight: 600; }
+        .table-container table.dataframe th:first-child { min-width: 150px; }
+        .table-container table.dataframe td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+        .table-container table.dataframe td:first-child { text-align: left; }
+        @media (max-width: 700px) {
+          .container-main { width: 98%; padding: 20px 14px; }
+          .analysis-section { padding: 14px; }
+          .table-container table { min-width: 620px; font-size: 0.88rem; }
+          .table-container th, .table-container td { padding: 8px 9px; }
         }
-
-        .navbar a {
-            color: white;
-            padding: 5px 10px;
-            text-decoration: none;
-            font-size: 16px;
-            display: inline-block;
-        }
-
-        .navbar a:hover {
-            background-color: #1abc9c;
-            color: white;
-        }
-        .container { width: 90%; max-width: 600px; margin: 50px auto; background: #fff; padding: 30px 40px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); text-align: center; }
-        h1 { color: #34495e; }
-        button { margin-top: 20px; padding: 12px 30px; background-color: #1abc9c; border: none; color: white; font-size: 16px; border-radius: 5px; cursor: pointer; }
-        button:hover { background-color: #16a085; }
+        .visualization { margin: 20px 0; text-align: center; }
+        .visualization img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+        .tabs { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 20px; background-color: #e9ecef; border: none; border-radius: 5px; cursor: pointer; font-weight: 500; transition: all 0.3s ease; }
+        .tab-btn.active { background-color: #1abc9c; color: white; }
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .recommendations { background: #fffbea; border-left: 4px solid #ffc107; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .recommendations h4 { color: #ff9800; margin-bottom: 10px; }
+        .recommendations li { margin: 5px 0; color: #333; }
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="/">Single Prediction</a>
-        <a href="/batch">Batch Prediction</a>
-        <a href="/train">Train Model</a>
-        <a href="/version">Version Info</a>
-        <a href="/visual">Visualize Risk</a>
+  <div class="navbar">
+    <a href="/">🏠 Single Prediction</a>
+    <a href="/batch">📦 Batch Prediction</a>
+    <a href="/train">🔧 Train Model</a>
+    <a href="/version">📊 Version Info</a>
+    <a href="/visual">📈 Visualize Risk</a>
+  </div>
+    
+  <div class="container-main">
+    <h1>🤖 Train Model & Comprehensive Analysis</h1>
+        
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+      {% endif %}
+    {% endwith %}
+        
+    {% if not data_loaded %}
+    <!-- UPLOAD SECTION -->
+    <div class="upload-section">
+      <h2 style="color: white; border-bottom: 2px solid rgba(255,255,255,0.3);">📁 Upload Training Dataset</h2>
+      <p style="margin-top: 10px; font-size: 1.1em;">Upload your data file to train the model and analyze it comprehensively</p>
+            
+      <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
+        <button type="submit">🚀 Upload & Analyze</button>
+      </form>
+            
+      <p style="margin-top: 20px; font-size: 0.95em; opacity: 0.9;">
+        ✅ Supported formats: CSV, XLS, XLSX<br>
+        ⏱️ Large files may take a few minutes to process
+      </p>
     </div>
-
-    <div class="navbar">
-        <a href="/admin">Admin</a>
-        <a href="/admin/train">Train Model</a>
-        <a href="/admin/visualize">Visualize Risk</a>
-
-    <div class="container">
-        <h1>Admin: Train Credit Default Model</h1>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <ul class="flashes">
-              {% for category, message in messages %}
-                <li class="{{ category }}">{{ message }}</li>
-              {% endfor %}
-            </ul>
+    {% else %}
+    <!-- ANALYSIS RESULTS -->
+        
+    <!-- 1. DATA QUALITY REPORT -->
+    {% if analysis_results.quality_report %}
+    <div class="analysis-section">
+      <h2>📊 Data Quality Report</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h4>Total Rows</h4>
+          <p>{{ analysis_results.quality_report.total_rows }}</p>
+        </div>
+        <div class="stat-card">
+          <h4>Total Columns</h4>
+          <p>{{ analysis_results.quality_report.total_columns }}</p>
+        </div>
+        <div class="stat-card">
+          <h4>Memory (MB)</h4>
+          <p>{{ "%.2f"|format(analysis_results.quality_report.memory_usage_mb) }}</p>
+        </div>
+        <div class="stat-card">
+          <h4>Missing Values</h4>
+          <p>{{ analysis_results.quality_report.total_missing }}</p>
+        </div>
+        <div class="stat-card">
+          <h4>Missing %</h4>
+          <p>{{ "%.2f"|format(analysis_results.quality_report.missing_percentage) }}%</p>
+        </div>
+        <div class="stat-card">
+          <h4>Duplicates</h4>
+          <p>{{ analysis_results.quality_report.duplicates }}</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+        
+    <!-- 2. STATISTICAL MEASURES -->
+    {% if analysis_results.statistics %}
+    <div class="analysis-section">
+      <h2>📈 Statistical Measures</h2>
+      <div class="table-container">
+        {{ analysis_results.statistics.html|safe }}
+      </div>
+    </div>
+    {% endif %}
+        
+    <!-- 3. DUPLICATES & UNIQUE VALUES -->
+    {% if analysis_results.duplicates or analysis_results.unique_values %}
+    <div class="analysis-section">
+      <h2>🔍 Data Characteristics</h2>
+            
+      {% if analysis_results.duplicates %}
+      <h3>Duplicate Records</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h4>Duplicate Count</h4>
+          <p>{{ analysis_results.duplicates.count }}</p>
+        </div>
+        <div class="stat-card">
+          <h4>Percentage</h4>
+          <p>{{ "%.2f"|format(analysis_results.duplicates.percentage) }}%</p>
+        </div>
+      </div>
+      {% endif %}
+            
+      {% if analysis_results.unique_values %}
+      <h3>Unique Values per Column</h3>
+      <div class="table-container">
+        {{ analysis_results.unique_values.html|safe }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+        
+    <!-- 4. CORRELATION HEATMAP -->
+    {% if analysis_results.heatmap %}
+    <div class="analysis-section">
+      <h2>🔗 Feature Correlation Analysis</h2>
+            
+      <div class="visualization">
+        <img src="{{ analysis_results.heatmap.image_base64 }}" alt="Correlation Heatmap">
+      </div>
+            
+      {% if analysis_results.heatmap.strong_correlations %}
+      <h3>Strong Correlations (r ≥ 0.7)</h3>
+      <div class="table-container">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Feature 1</th>
+              <th>Feature 2</th>
+              <th>Correlation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for corr in analysis_results.heatmap.strong_correlations %}
+            <tr>
+              <td>{{ corr.Feature1 }}</td>
+              <td>{{ corr.Feature2 }}</td>
+              <td><strong>{{ corr.Correlation }}</strong></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+        
+    <!-- 5. PAYMENT HISTORY ANALYSIS -->
+    {% if analysis_results.payment_analysis %}
+    <div class="analysis-section">
+      <h2>💳 Payment History Analysis</h2>
+      <p>Payment status distribution across payment history columns</p>
+            
+      {% if analysis_results.payment_analysis.images %}
+      <div class="tabs">
+        {% for item in analysis_results.payment_analysis.images %}
+        <button class="tab-btn {% if loop.first %}active{% endif %}" onclick="showTab(event, 'payment-{{ loop.index }}')">
+          {{ item.column }}
+        </button>
+        {% endfor %}
+      </div>
+            
+      {% for item in analysis_results.payment_analysis.images %}
+      <div id="payment-{{ loop.index }}" class="tab-content {% if loop.first %}active{% endif %}">
+        <div class="visualization">
+          <img src="{{ item.image }}" alt="{{ item.column }}">
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
+        
+    <!-- 6. FEATURE IMPORTANCE -->
+    {% if analysis_results.feature_importance %}
+    <div class="analysis-section">
+      <h2>⭐ Feature Importance Analysis</h2>
+            
+      {% if analysis_results.feature_importance.plot %}
+      <div class="visualization">
+        <img src="{{ analysis_results.feature_importance.plot.image_base64 }}" alt="Feature Importance">
+      </div>
+            
+      <h3>Top 10 Important Features</h3>
+      <div class="table-container">
+        {{ analysis_results.feature_importance.plot.html_table|safe }}
+      </div>
+      {% endif %}
+            
+      {% if analysis_results.feature_importance.report %}
+      <div class="recommendations">
+        <h4>📌 Feature Analysis Summary</h4>
+        <ul>
+          <li><strong>Total Features:</strong> {{ analysis_results.feature_importance.report.total_features }}</li>
+          <li><strong>Top Feature:</strong> {{ analysis_results.feature_importance.report.top_1_feature }} ({{ analysis_results.feature_importance.report.top_1_importance }})</li>
+          <li><strong>Mean Importance:</strong> {{ analysis_results.feature_importance.report.mean_importance }}</li>
+          <li><strong>Top 5 Cumulative:</strong> {{ analysis_results.feature_importance.report.cumulative_importance_top_5 }}</li>
+          <li><strong>Type:</strong> {{ analysis_results.feature_importance.report.importance_type }}</li>
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+        
+    <!-- 7. MODEL COMPARISON -->
+    {% if analysis_results.model_comparison %}
+    <div class="analysis-section">
+      <h2>🤖 Model Comparison Results</h2>
+            
+      {% if analysis_results.model_comparison.recommendations %}
+      <div class="recommendations">
+        <h4>🏆 Model Recommendations</h4>
+        <ul>
+          <li><strong>Best Model:</strong> {{ analysis_results.model_comparison.recommendations.best_model }}</li>
+          <li><strong>Best Accuracy:</strong> {{ "%.4f"|format(analysis_results.model_comparison.recommendations.best_model_accuracy) }}</li>
+          <li><strong>Models Tested:</strong> {{ analysis_results.model_comparison.recommendations.total_models_tested }}</li>
+          {% if analysis_results.model_comparison.recommendations.accuracy_stats %}
+          <li><strong>Average Accuracy:</strong> {{ "%.4f"|format(analysis_results.model_comparison.recommendations.accuracy_stats.mean_accuracy) }}</li>
           {% endif %}
-        {% endwith %}
-
-        <form method="POST">
-            <button type="submit" class="btn-train">Start Training</button>
-        </form>
-        <a href="/" class="btn-link">← Back to Home</a>
+        </ul>
+      </div>
+      {% endif %}
+            
+      {% if analysis_results.model_comparison.plot %}
+      <div class="visualization">
+        <img src="{{ analysis_results.model_comparison.plot.image_base64 }}" alt="Model Comparison">
+      </div>
+      {% endif %}
+            
+      {% if analysis_results.model_comparison.formatted %}
+      <h3>All Models Performance Metrics</h3>
+      <div class="table-container">
+        {{ analysis_results.model_comparison.formatted.all_models_html|safe }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+        
+    <!-- 8. MODEL TRAINING RESULTS -->
+    {% if analysis_results.model_training %}
+    <div class="analysis-section">
+      <h2>✅ Model Training Results</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h4>Model Accuracy</h4>
+          <p>{{ "%.2f"|format(analysis_results.model_training.accuracy) }}%</p>
+        </div>
+        <div class="stat-card">
+          <h4>Model Path</h4>
+          <p style="font-size: 0.9em; word-break: break-all;">{{ analysis_results.model_training.model_path }}</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+        
+    <!-- FOOTER ACTIONS -->
+    <div style="text-align: center; margin-top: 40px;">
+      <a href="/train" class="btn btn-primary" style="margin-right: 10px;">📁 Upload Another File</a>
+      <a href="/" class="btn btn-secondary">🏠 Back to Home</a>
+    </div>
+        
+    {% endif %}
+  </div>
+    
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function showTab(evt, tabName) {
+      var i, tabcontent, tabbuttons;
+            
+      // Hide all tab contents
+      tabcontent = document.querySelectorAll('.tab-content');
+      tabcontent.forEach(function(tab) {
+        tab.classList.remove('active');
+      });
+            
+      // Deactivate all tab buttons
+      tabbuttons = document.querySelectorAll('.tab-btn');
+      tabbuttons.forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+            
+      // Show selected tab and activate button
+      document.getElementById(tabName).classList.add('active');
+      evt.currentTarget.classList.add('active');
+    }
+  </script>
     </div>
 </body>
 </html>

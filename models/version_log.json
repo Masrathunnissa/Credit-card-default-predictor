@@ -1,0 +1,4 @@
+{"timestamp": "2026-08-27T01:36:49.915394", "model_path": "models\\credit_model_20260827_013649.pkl", "accuracy": 85.0}
+{"timestamp": "2026-08-27T01:38:06.635342", "model_path": "models\\credit_model_20260827_013806.pkl", "accuracy": 85.0}
+{"timestamp": "2026-08-27T01:44:00.434035", "model_path": "models\\credit_model_20260827_014400.pkl", "accuracy": 85.0}
+{"timestamp": "2026-08-27T01:46:38.641820", "model_path": "models\\credit_model_20260827_014638.pkl", "accuracy": 85.0}
