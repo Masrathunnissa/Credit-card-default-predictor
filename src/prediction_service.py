@@ -15,13 +15,11 @@ from datetime import datetime
 # input_array = [('limit_balance', '124552'), ('Gender', '1'), ('education', '1'), ('age', '30'), ('PAY_0', '1'), ('PAY_2', '2'), ('PAY_1', '4'), ('PAY_3', '5'), ('PAY_4', '6'), ('PAY_5', '4'), ('PAY_6', '5'), ('bill_amt_sep', '15482'), ('bill_amt_aug', '454541'), ('bill_amt_jul', '45545'), ('bill_amt_jun', '15454'), ('bill_amt_may', '4545'), ('bill_amt_apr', '4554'), ('pay_amt_sep', '1'), ('pay_amt_aug', '2'), ('pay_amt_jul', '2'), ('pay_amt_jun', '3'), ('pay_amt_may', ''), ('pay_amt_mar', ''), ('output_format', 'csv'), ('email', '')]
 # === Helper: Find latest model directory ===
 fields = [
-            'limit_balance', 'Gender', 'education', 'age', 
-            #'marital_status', 'Credit Card Type', 'Credit Card Limit Utilization', 'Credit Card Usage',
-            'PAY_0', 'PAY_1', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6',
-            'bill_amt_sep', 'bill_amt_aug', 'bill_amt_jul', 'bill_amt_jun', 'bill_amt_may', 'bill_amt_apr',
-            'pay_amt_sep', 'pay_amt_aug', 'pay_amt_jul', 'pay_amt_jun', 'pay_amt_may', 'pay_amt_mar'
-        ]
-optional_fields = ['Gender', 'education','age']
+    'limit_balance', 'Gender', 'education', 'marital_status', 'age',
+    'PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6',
+    'bill_amt_sep', 'bill_amt_aug', 'bill_amt_jul', 'bill_amt_jun', 'bill_amt_may', 'bill_amt_apr',
+    'pay_amt_sep', 'pay_amt_aug', 'pay_amt_jul', 'pay_amt_jun', 'pay_amt_may', 'pay_amt_mar'
+]
 
 
 def format_user_input_lines(user_values=None, feature_names=None):
@@ -595,52 +593,38 @@ def predict_default(input_dic, user_values=None):
 
 from werkzeug.datastructures import ImmutableMultiDict
 def clean_input(input_data):
-    # Convert to dict if it's not already
-    if not isinstance(input_data, ImmutableMultiDict):
-        try:
-            # input_data = dict(input_data)
-            input_data = input_data.to_dict()
-        except Exception as e:
-            raise ValueError(f"Invalid input format: {e}")
+    if isinstance(input_data, (ImmutableMultiDict, pd.Series)):
+        input_data = input_data.to_dict()
+    elif not isinstance(input_data, dict):
+        raise ValueError(f"Invalid input format: {type(input_data).__name__}")
 
     # Drop keys that are not features
-    ignore_keys = ['output_format', 'email']
+    ignore_keys = ['output_format', 'email', 'email_report']
     input_data = {k: v for k, v in input_data.items() if k not in ignore_keys}
-    # Step 1: Filter out fields not in `fields`
     filtered_input = {k: v for k, v in input_data.items() if k in fields}
 
-    # Step 2: If still more than 21, drop optional fields in order
-    while len(filtered_input) > 21 and optional_fields:
-        for field in optional_fields:
-            if field in filtered_input:
-                del filtered_input[field]
-                if len(filtered_input) == 21:
-                    break
+    missing_fields = [field for field in fields if field not in filtered_input]
+    if missing_fields:
+        raise ValueError(f"Missing required features: {', '.join(missing_fields)}")
 
-    # Step 3: Error if we still don’t have 21
-    if len(filtered_input) != 21:
-        raise ValueError(f"Expected 21 features, got {len(filtered_input)}. Final keys: {list(filtered_input.keys())}")
-   
-    # Step 4: Handle missing or blank values and convert to float
-    for k in filtered_input:
+    for k in fields:
         v = filtered_input[k]
         try:
             filtered_input[k] = float(v) if v != '' else 0.0
         except ValueError:
             raise ValueError(f"Invalid value for feature '{k}': {v}")
                           
-    return filtered_input
+    return {field: filtered_input[field] for field in fields}
 
 def prepare_input_data(input_data):
-    # Define required and optional fields
     # --- Handle row (Series or dict) ---
     if isinstance(input_data, (pd.Series, dict)):
         cleaned_row = clean_input(input_data)
-        return pd.DataFrame([cleaned_row])
+        return pd.DataFrame([cleaned_row], columns=fields)
 
     elif isinstance(input_data, ImmutableMultiDict):
         cleaned_row = clean_input(input_data)
-        return pd.DataFrame([cleaned_row])
+        return pd.DataFrame([cleaned_row], columns=fields)
 
     # --- Handle batch DataFrame ---
     elif isinstance(input_data, pd.DataFrame):
@@ -651,7 +635,7 @@ def prepare_input_data(input_data):
                 cleaned_rows.append(cleaned_row)
             except Exception as e:
                 raise ValueError(f"Row {idx} failed: {e}")
-        return pd.DataFrame(cleaned_rows)
+        return pd.DataFrame(cleaned_rows, columns=fields)
 
     else:
         raise TypeError("Input must be a pandas DataFrame, Series, or dict.")
