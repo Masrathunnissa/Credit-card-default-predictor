@@ -349,14 +349,20 @@ def validate():
     else:
         flash("Unsupported file format.", "danger")
         return redirect(url_for('batch'))
-
+    
+    credit_limit_threshold = float(request.form.get('credit_limit_threshold', 300000))
+    repayment_history_threshold = int(request.form.get('repayment_history_threshold', 2))
+    low_repayment_ratio_threshold = float(request.form.get('low_repayment_ratio_threshold', 0.5))
+    session['credit_limit_threshold'] = credit_limit_threshold
+    session['repayment_history_threshold'] = repayment_history_threshold
+    session['low_repayment_ratio_threshold'] = low_repayment_ratio_threshold
     # if not set(expected_features).issubset(df.columns):
     #     flash('File missing required columns.', 'danger')
     #     return redirect(url_for('batch'))
 
     try:
         flash('File uploaded. Running validation and preprocessing...', 'info')
-        clean_data, run_dir = preprocess_data(df)
+        clean_data, run_dir = preprocess_data(df, credit_limit_threshold, repayment_history_threshold, low_repayment_ratio_threshold)
         os.makedirs(run_dir, exist_ok=True)  # ensure directory exists
         print(f"run_dir = {run_dir}")
         encoded_run_dir = urllib.parse.quote(run_dir)

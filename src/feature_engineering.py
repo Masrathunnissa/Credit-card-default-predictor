@@ -33,7 +33,7 @@ from sklearn.metrics import (
 # from src.prediction_service import predict_default,batch_predict_default
 
 # filepath = "C:/Users/masra/Desktop/Project/credit-card-prediction/data/default of credit card clients.xls"
-def preprocess_data(df):
+def preprocess_data(df, credit_limit_threshold=300000, repayment_history_threshold=2, low_repayment_ratio_threshold=0.2):
     print("🔍 Preprocessing data...")
     output_model_dir="models"
     # df = pd.read_excel(filepath, header=1)#coment this later
@@ -71,22 +71,22 @@ def preprocess_data(df):
         df.drop(columns=['ID'], inplace=True)
     # Rule 1: Serious delay (>=2) in any payment status
     serious_delay = (
-        (df['PAY_0'] >= 2) |
-        (df['PAY_2'] >= 2) |
-        (df['PAY_3'] >= 2) |
-        (df['PAY_4'] >= 2) |
-        (df['PAY_5'] >= 2) |
-        (df['PAY_6'] >= 2)
+        (df['PAY_0'] >= repayment_history_threshold) |
+        (df['PAY_2'] >= repayment_history_threshold) |
+        (df['PAY_3'] >= repayment_history_threshold) |
+        (df['PAY_4'] >= repayment_history_threshold) |
+        (df['PAY_5'] >= repayment_history_threshold) |
+        (df['PAY_6'] >= repayment_history_threshold)
     )
 
     # Rule 2: Low repayment ratio (average pay < 20% of bill)
     bill_total = df[['BILL_AMT1', 'BILL_AMT2', 'BILL_AMT3', 'BILL_AMT4', 'BILL_AMT5', 'BILL_AMT6']].mean(axis=1)
     pay_total = df[['PAY_AMT1', 'PAY_AMT2', 'PAY_AMT3', 'PAY_AMT4']].mean(axis=1)
-    low_payment_ratio = (pay_total / (bill_total + 1e-6)) < 0.2  # +1e-6 avoids division by zero
+    low_payment_ratio = (pay_total / (bill_total + 1e-6)) < low_repayment_ratio_threshold  # +1e-6 avoids division by zero
 
     # Rule 3: Low credit limit and delay
-    low_limit = df['LIMIT_BAL'] < 100000
-    some_delay = (df['PAY_0'] > 0)
+    low_limit = df['LIMIT_BAL'] < credit_limit_threshold
+    some_delay = (df['PAY_0'] > repayment_history_threshold)
 
     if 'default.payment.next.month' not in df.columns:
     # Initialize the target variable with zeros
