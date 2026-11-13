@@ -56,19 +56,16 @@ def preprocess_data(df, credit_limit_threshold=300000, repayment_history_thresho
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # Optional: Handle NaNs if coercion failed on any row
-    df.dropna(subset=col_meta, inplace=True)
-    for col in col_meta:
-        if col not in df.columns:
-            print(f"Column {col} is missing from the dataset. Please check the input file.")
-            sys.exit(1)
+    required_columns = [col for col in col_meta if col != "ID"]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(
+            "Missing required columns: " + ", ".join(missing_columns)
+        )
 
-    if col not in df.columns:
-        print(f"Missing required column: {col}")
-        sys.exit(1)  # Stop script if any required column is missing
-
-    if 'ID' in df.columns:
-        df.drop(columns=['ID'], inplace=True)
+    df.dropna(subset=required_columns, inplace=True)
+    if "ID" in df.columns:
+        df.drop(columns=["ID"], inplace=True)
     # Rule 1: Serious delay (>=2) in any payment status
     serious_delay = (
         (df['PAY_0'] >= repayment_history_threshold) |
