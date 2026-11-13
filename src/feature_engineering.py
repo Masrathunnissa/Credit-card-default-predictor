@@ -56,19 +56,16 @@ def preprocess_data(df, credit_limit_threshold=300000, repayment_history_thresho
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # Optional: Handle NaNs if coercion failed on any row
-    df.dropna(subset=col_meta, inplace=True)
-    for col in col_meta:
-        if col not in df.columns:
-            print(f"Column {col} is missing from the dataset. Please check the input file.")
-            sys.exit(1)
+    required_columns = [col for col in col_meta if col != "ID"]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(
+            "Missing required columns: " + ", ".join(missing_columns)
+        )
 
-    if col not in df.columns:
-        print(f"Missing required column: {col}")
-        sys.exit(1)  # Stop script if any required column is missing
-
-    if 'ID' in df.columns:
-        df.drop(columns=['ID'], inplace=True)
+    df.dropna(subset=required_columns, inplace=True)
+    if "ID" in df.columns:
+        df.drop(columns=["ID"], inplace=True)
     # Rule 1: Serious delay (>=2) in any payment status
     serious_delay = (
         (df['PAY_0'] >= repayment_history_threshold) |
@@ -88,14 +85,13 @@ def preprocess_data(df, credit_limit_threshold=300000, repayment_history_thresho
     low_limit = df['LIMIT_BAL'] < credit_limit_threshold
     some_delay = (df['PAY_0'] > repayment_history_threshold)
 
-    if 'default.payment.next.month' not in df.columns:
-    # Initialize the target variable with zeros
-        df['default.payment.next.month'] = 0
-    # Apply the rules to generate the target variable
-        df['default.payment.next.month'] = ((serious_delay) | (low_payment_ratio) | (low_limit & some_delay)).astype(int)
+    if "default" in df.columns:
+        pass
+    elif "default.payment.next.month" in df.columns:
+        df.rename(columns={"default.payment.next.month": "default"}, inplace=True)
+    else:
+        df["default"] = ((serious_delay) | (low_payment_ratio) | (low_limit & some_delay)).astype(int)
         print("Generated target variable:")
-
-    df.rename(columns={"default.payment.next.month": "default"}, inplace=True)
     print("✅ Preprocessing complete. Target variable 'default.payment.next.month' generated.")
 
     if df.isnull().values.any():

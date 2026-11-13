@@ -42,7 +42,17 @@ MODEL_TO_FORM = {
     'PAY_AMT6': 'pay_amt_mar',
 }
 IGNORED_TRAINING_COLUMNS = {'default', 'default.payment.next.month', 'ID', 'id'}
+FORM_TO_MODEL = {form_name: model_name for model_name, form_name in MODEL_TO_FORM.items()}
 fields = list(FORM_FEATURES)
+
+
+def feature_aliases(feature_name):
+    """Form names and the original training column names for one model input."""
+    aliases = [feature_name]
+    for other_name in (FORM_TO_MODEL.get(feature_name), MODEL_TO_FORM.get(feature_name)):
+        if other_name and other_name not in aliases:
+            aliases.append(other_name)
+    return aliases
 
 
 def features_for_model(run_dir, n_features):
@@ -517,26 +527,17 @@ def append_predictions_to_dataframe(input_df, results):
     return input_df.reset_index(drop=True).join(predictions_df)
 
 def predict_from_dataframe_safe(df):
-    # Make sure all required columns exist
-    expected_cols = [col for col in fields if col != 'ID']
-    missing_cols = [col for col in expected_cols if col not in df.columns]
-
-    if missing_cols:
-        print(f"⚠️ Missing columns: {missing_cols}. Filling with 0s.")
-        for col in missing_cols:
-            df[col] = 0.0
-
-    # Ensure numeric types
-    df = df.astype({col: 'float64' for col in expected_cols if col in df.columns})
-
+    df = df.copy()
+    value_columns = [column for column in df.columns if column not in IGNORED_TRAINING_COLUMNS]
+    df[value_columns] = df[value_columns].apply(pd.to_numeric, errors="coerce").fillna(0.0)
     print("✅ Columns and types ready. Running batch prediction...")
     return batch_predict_default(df)
 def batch_predict_default(df):
     # Prepare input data (clean, reorder, etc.)
-    input_array = prepare_input_data(df)
+    input_frame = prepare_input_data(df)
 
-    # Scale all at once
-    input_scaled = scaler.transform(input_array)
+    # Scale by position. The saved scaler was fit on LIMIT_BAL, AGE, BILL_AMT1, ...
+    input_scaled = scaler.transform(input_frame.to_numpy(dtype=float))
 
     # Predict all at once
     predictions = model.predict(input_scaled)
@@ -680,20 +681,30 @@ def clean_input(input_data):
     # Drop keys that are not features
     ignore_keys = ['output_format', 'email', 'email_report']
     input_data = {k: v for k, v in input_data.items() if k not in ignore_keys}
-    filtered_input = {k: v for k, v in input_data.items() if k in fields}
 
-    missing_fields = [field for field in fields if field not in filtered_input]
-    if missing_fields:
-        raise ValueError(f"Missing required features: {', '.join(missing_fields)}")
-
-    for k in fields:
-        v = filtered_input[k]
+    cleaned = {}
+    for feature_name in fields:
+        value = None
+        for alias in feature_aliases(feature_name):
+            if alias not in input_data:
+                continue
+            candidate = input_data[alias]
+            if isinstance(candidate, (list, tuple)):
+                candidate = candidate[0] if candidate else ""
+            if candidate is None or (isinstance(candidate, float) and np.isnan(candidate)):
+                continue
+            if isinstance(candidate, str) and candidate.strip() == "":
+                continue
+            value = candidate
+            break
+        if value is None:
+            value = 0.0
         try:
-            filtered_input[k] = float(v) if v != '' else 0.0
-        except ValueError:
-            raise ValueError(f"Invalid value for feature '{k}': {v}")
-                          
-    return {field: filtered_input[field] for field in fields}
+            cleaned[feature_name] = float(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid value for feature '{feature_name}': {value}")
+
+    return cleaned
 
 def prepare_input_data(input_data):
     # --- Handle row (Series or dict) ---
