@@ -14,12 +14,51 @@ from datetime import datetime
 
 # input_array = [('limit_balance', '124552'), ('Gender', '1'), ('education', '1'), ('age', '30'), ('PAY_0', '1'), ('PAY_2', '2'), ('PAY_1', '4'), ('PAY_3', '5'), ('PAY_4', '6'), ('PAY_5', '4'), ('PAY_6', '5'), ('bill_amt_sep', '15482'), ('bill_amt_aug', '454541'), ('bill_amt_jul', '45545'), ('bill_amt_jun', '15454'), ('bill_amt_may', '4545'), ('bill_amt_apr', '4554'), ('pay_amt_sep', '1'), ('pay_amt_aug', '2'), ('pay_amt_jul', '2'), ('pay_amt_jun', '3'), ('pay_amt_may', ''), ('pay_amt_mar', ''), ('output_format', 'csv'), ('email', '')]
 # === Helper: Find latest model directory ===
-fields = [
+# Form fields in the same order as the training columns. PAY_AMT5 and PAY_AMT6
+# are present only on models trained with 23 features.
+FORM_FEATURES = [
     'limit_balance', 'Gender', 'education', 'marital_status', 'age',
     'PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6',
     'bill_amt_sep', 'bill_amt_aug', 'bill_amt_jul', 'bill_amt_jun', 'bill_amt_may', 'bill_amt_apr',
     'pay_amt_sep', 'pay_amt_aug', 'pay_amt_jul', 'pay_amt_jun', 'pay_amt_may', 'pay_amt_mar'
 ]
+MODEL_TO_FORM = {
+    'LIMIT_BAL': 'limit_balance',
+    'SEX': 'Gender',
+    'EDUCATION': 'education',
+    'MARRIAGE': 'marital_status',
+    'AGE': 'age',
+    'BILL_AMT1': 'bill_amt_sep',
+    'BILL_AMT2': 'bill_amt_aug',
+    'BILL_AMT3': 'bill_amt_jul',
+    'BILL_AMT4': 'bill_amt_jun',
+    'BILL_AMT5': 'bill_amt_may',
+    'BILL_AMT6': 'bill_amt_apr',
+    'PAY_AMT1': 'pay_amt_sep',
+    'PAY_AMT2': 'pay_amt_aug',
+    'PAY_AMT3': 'pay_amt_jul',
+    'PAY_AMT4': 'pay_amt_jun',
+    'PAY_AMT5': 'pay_amt_may',
+    'PAY_AMT6': 'pay_amt_mar',
+}
+IGNORED_TRAINING_COLUMNS = {'default', 'default.payment.next.month', 'ID', 'id'}
+fields = list(FORM_FEATURES)
+
+
+def features_for_model(run_dir, n_features):
+    """Return form feature names in the order this saved model was trained."""
+    csv_path = Path(run_dir) / "preprocessed_data.csv"
+    if csv_path.is_file():
+        columns = [
+            column for column in pd.read_csv(csv_path, nrows=0).columns
+            if column not in IGNORED_TRAINING_COLUMNS
+        ]
+        if len(columns) == n_features:
+            return [MODEL_TO_FORM.get(column, column) for column in columns]
+
+    if n_features <= len(FORM_FEATURES):
+        return list(FORM_FEATURES[:n_features])
+    return list(FORM_FEATURES)
 
 
 def format_user_input_lines(user_values=None, feature_names=None):
@@ -333,33 +372,72 @@ def generate_html_metrics_report(metrics_file_path, output_html_path):
     return output_html_path
 
 
-def get_latest_model_dir(models_root="models"):
-    # subdirs = [
-    #     os.path.join(models_root, d) for d in os.listdir(models_root)
-    #     if os.path.isdir(os.path.join(models_root, d)) and d.startswith("run_")
-    # ]
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+REQUIRED_ARTIFACTS = ("credit_model", "scaler", "X_train_scaled")
+
+
+def _resolve_models_root(models_root="models"):
     models_root = Path(models_root)
+    if not models_root.is_absolute():
+        models_root = PROJECT_ROOT / models_root
+    return models_root
+
+
+def _matching_artifact(run_dir, token):
+    matches = [
+        path for path in run_dir.iterdir()
+        if path.is_file() and token in path.name and path.suffix == ".pkl"
+    ]
+    return matches[0] if matches else None
+
+
+def get_latest_model_dir(models_root="models"):
+    models_root = _resolve_models_root(models_root)
+    if not models_root.is_dir():
+        raise FileNotFoundError(f"❌ Models directory not found: {models_root}")
+
     subdirs = [d for d in models_root.iterdir() if d.is_dir() and d.name.startswith("run_")]
     if not subdirs:
         raise FileNotFoundError("❌ No model runs found in 'models/' directory.")
 
-    latest_subdir = max(subdirs, key=os.path.getmtime)
+    complete = [
+        run_dir for run_dir in subdirs
+        if all(_matching_artifact(run_dir, token) for token in REQUIRED_ARTIFACTS)
+    ]
+    if not complete:
+        raise FileNotFoundError(
+            "❌ No complete model run found. Each run needs credit_model, scaler, "
+            "and X_train_scaled .pkl files."
+        )
+
+    latest_subdir = max(complete, key=os.path.getmtime)
+    newest_subdir = max(subdirs, key=os.path.getmtime)
+    if newest_subdir != latest_subdir:
+        missing = [
+            token for token in REQUIRED_ARTIFACTS
+            if _matching_artifact(newest_subdir, token) is None
+        ]
+        print(
+            f"⚠️ Latest run {newest_subdir.name} is missing {', '.join(missing)}. "
+            f"Using complete run {latest_subdir.name}."
+        )
     return latest_subdir
 
-    # === Load latest model and scaler ===
-latest_dir = get_latest_model_dir()
-model_files = os.listdir(latest_dir)
 
-model_path = [os.path.join(latest_dir, f) for f in model_files if "credit_model" in f][0]
-scaler_path = [os.path.join(latest_dir, f) for f in model_files if "scaler" in f][0]
-train_path = [os.path.join(latest_dir, f) for f in model_files if "X_train_scaled" in f][0]
+# === Load latest model and scaler ===
+latest_dir = get_latest_model_dir()
+model_path = str(_matching_artifact(latest_dir, "credit_model"))
+scaler_path = str(_matching_artifact(latest_dir, "scaler"))
+train_path = str(_matching_artifact(latest_dir, "X_train_scaled"))
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
 X_train_scaled = joblib.load(train_path)
+fields = features_for_model(latest_dir, int(getattr(scaler, "n_features_in_", len(FORM_FEATURES))))
 
 print("SCALER:", scaler)
 print(f"✅ Loaded model from: {model_path}")
 print(f"✅ Loaded scaler from: {scaler_path}")
+print(f"✅ Using {len(fields)} features: {', '.join(fields)}")
 
 # === Prediction function ===
 # def com_batch_predict_default(input_data):
@@ -564,8 +642,9 @@ def predict_default(input_dic, user_values=None):
         model=model,
         input_scaled=input_scaled,
         shap_plot_path=shap_plot_path,
-        X_train_scaled=input_scaled,
-        feature_names=fields
+        X_train_scaled=X_train_scaled,
+        feature_names=fields,
+        raw_features=input_array,
     )
 
     print(f"SHAP plot saved to {shap_plot_path}")
@@ -850,28 +929,50 @@ def save_single_txt(txt_path, prediction=None, probability=None, user_input_valu
     
     print(f"✅ TXT report saved at: {txt_path}")
 
-def save_shap_plot_as_png(model, input_scaled, shap_plot_path, X_train_scaled=None, feature_names=None):
+def save_shap_plot_as_png(model, input_scaled, shap_plot_path, X_train_scaled=None, feature_names=None, raw_features=None):
     """
-    Save SHAP explanation plot for a single prediction as a PNG image using waterfall plot.
+    Save a SHAP waterfall plot for this input, measured against the training data.
     """
-    if X_train_scaled is not None:
-        explainer = shap.Explainer(model, X_train_scaled)
-    else:
-        explainer = shap.Explainer(model)
+    background = np.asarray(X_train_scaled) if X_train_scaled is not None else None
+    if background is None or background.ndim != 2 or background.shape[0] < 2:
+        raise ValueError("SHAP background must be the saved training matrix.")
 
+    # The training mean is enough for this linear model and keeps the plot specific to the input.
+    if background.shape[0] > 500:
+        sample_index = np.linspace(0, background.shape[0] - 1, 500, dtype=int)
+        background = background[sample_index]
+
+    explainer = shap.Explainer(model, background)
     shap_values = explainer(input_scaled)
+    if feature_names is not None:
+        shap_values.feature_names = list(feature_names)
+    if raw_features is not None:
+        shap_values.data = np.asarray(raw_features, dtype=float).reshape(shap_values.data.shape)
 
-    plt.figure(figsize=(14, 9))
+    plt.close("all")
     try:
-        shap.plots.waterfall(shap_values[0], show=False)
-        plt.title(f"SHAP Waterfall Plot - How Features Affect Default Prediction\n(Red = Increases Risk, Blue = Decreases Risk)", fontsize=13, fontweight='bold')
+        shap.plots.waterfall(shap_values[0], max_display=15, show=False)
+        plt.title(
+            "SHAP Waterfall Plot - How Features Affect Default Prediction\n(Red = Increases Risk, Blue = Decreases Risk)",
+            fontsize=13,
+            fontweight="bold",
+        )
     except Exception as e:
         print(f"Waterfall plot failed: {e}")
-        shap.plots.force(shap_values.base_values, shap_values.values[0], features=input_scaled[0], feature_names=feature_names or None, matplotlib=True, show=False)
+        displayed = raw_features if raw_features is not None else input_scaled
+        shap.plots.force(
+            shap_values.base_values,
+            shap_values.values[0],
+            features=np.asarray(displayed).reshape(-1),
+            feature_names=feature_names or None,
+            matplotlib=True,
+            show=False,
+        )
 
+    plt.gcf().set_size_inches(14, 9)
     plt.tight_layout()
-    plt.savefig(shap_plot_path, bbox_inches='tight', dpi=100)
-    plt.close()
+    plt.savefig(shap_plot_path, bbox_inches="tight", dpi=100)
+    plt.close("all")
     print(f"✅ SHAP plot saved at: {shap_plot_path}")
 
 
