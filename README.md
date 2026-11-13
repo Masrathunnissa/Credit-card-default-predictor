@@ -145,6 +145,6 @@ Important Notes
 
 - Do not commit the "venv/" folder.
 - Do not commit "__pycache__/" folders or ".pyc" files.
-- Do not commit ".env" files containing passwords, API keys, or other sensitive information.
+- Do not commit ".env" files containing , API keys, or other sensitive information.
 - Make sure required dependencies are maintained in "requirements.txt".
 - Use the Python version specified for the project when creating the virtual environment.

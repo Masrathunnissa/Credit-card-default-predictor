@@ -331,11 +331,11 @@
                 <small style="color: #666; margin-top: 5px; display: block;">Shows which features had the most influence on your prediction</small>
             </div>
             <div class="card-body" style="padding: 15px;">
-                <!-- {% if shap_path %}
+                {% if shap_path %}
                 <div id="shap-plot" style="text-align: center; margin-bottom: 15px;">
                     <img src="{{ url_for('static', filename=shap_path) }}" alt="SHAP Plot" style="max-width: 100%; height: auto; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 </div>
-                {% endif %} -->
+                {% endif %}
                 <div style="padding: 12px; background-color: #f0f7ff; border-radius: 5px; font-size: 12px; color: #333; line-height: 1.6;">
                     <strong>📌 How to Interpret This Plot:</strong>
                     <ul style="margin: 10px 0; padding-left: 20px;">

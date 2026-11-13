@@ -8,17 +8,17 @@
 2. Add your credentials:
    ```
    MAIL_USER=your-email@gmail.com
-   MAIL_PASS=your-16-char-app-password
+   MAIL_PASS=your-16-char-app-
    ```
 
-### Step 2: Get Gmail App Password
+### Step 2: Get Gmail App 
 
 1. Go to: **https://myaccount.google.com/security**
 2. Make sure **2-Step Verification is ON**
-3. Search for **"App passwords"**
+3. Search for **"App "**
 4. Select: Mail → Windows Computer
 5. Click **Generate**
-6. Copy the **16-character password** (remove spaces)
+6. Copy the **16-character ** (remove spaces)
 7. Paste into `.env` file as `MAIL_PASS`
 
 ### Step 3: Test It
@@ -52,7 +52,7 @@ MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USE_TLS=True
 MAIL_USER=john.doe@gmail.com
-MAIL_PASS=abcdefghijklmnop
+MAIL_PASS=
 ```
 
 ---
@@ -72,9 +72,9 @@ No need to set Windows environment variables anymore! ✅
 
 - **DO NOT commit `.env` file to Git** (it's in .gitignore)
 - Keep `.env.example` in Git as a template
-- Never share your `.env` file - it has your password!
-- Use **app-specific password** from Google, not your regular password
-- The app-specific password is 16 characters (include all characters, remove spaces if copied)
+- Never share your `.env` file - it has your !
+- Use **app-specific ** from Google, not your regular 
+- The app-specific  is 16 characters (include all characters, remove spaces if copied)
 
 ---
 
@@ -95,8 +95,8 @@ No need to set Windows environment variables anymore! ✅
 |-------|----------|
 | Still seeing "not configured" warning | Restart Flask app after editing .env |
 | Email not received | Check spam folder; verify 2FA enabled |
-| "Authentication failed" | Make sure using app-specific password, not regular password |
-| Empty email field in .env | Add your Gmail address and app password |
+| "Authentication failed" | Make sure using app-specific , not regular  |
+| Empty email field in .env | Add your Gmail address and app  |
 
 ---
 

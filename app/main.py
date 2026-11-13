@@ -27,6 +27,7 @@ from flask_mail import Mail, Message
 import urllib.parse
 
 from src.prediction_service import (
+    fields,
     predict_default,
     predict_from_dataframe_safe,
     save_results_to_csv,
@@ -78,10 +79,8 @@ REQUIRED_COLUMNS = 23
 # app.config['MAIL_PORT'] = 587
 # app.config['MAIL_USE_TLS'] = True
 # app.config['MAIL_USERNAME'] = 'your_email@gmail.com'       # Replace with your email
-# app.config['MAIL_PASSWORD'] = 'your_app_password_here'     # Use App Password, not your real password
 
 # app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USER')
-# app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASS')
 
 # mail = Mail(app)
 
@@ -94,7 +93,7 @@ DOWNLOADS_FOLDER = os.path.join(BASE_DIR, 'downloads')
 # def send_email_with_pdf(to_email, subject, body, pdf_filename):
 #     """Send email with PDF attachment for single prediction."""
 #     try:
-#         if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
+#         if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASS']:
 #             print("⚠️ Email not configured. Set MAIL_USER and MAIL_PASS environment variables.")
 #             return False
             
@@ -126,7 +125,7 @@ DOWNLOADS_FOLDER = os.path.join(BASE_DIR, 'downloads')
 # def send_email_with_attachment(to_email, subject, body, file_path, filename):
     # """Generic function to send email with file attachment."""
     # try:
-    #     if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
+    #     if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASS']:
     #         print("⚠️ Email not configured. Set MAIL_USER and MAIL_PASS environment variables.")
     #         return False
             
@@ -197,13 +196,6 @@ def home():
     show_scroll_notice = False
     if request.method == 'POST':
         submitted_values = request.form.to_dict()
-        fields = [
-            'limit_balance', 'Gender', 'education', 'age', 
-            #'marital_status', 'Credit Card Type', 'Credit Card Limit Utilization', 'Credit Card Usage',
-            'PAY_0', 'PAY_1', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6',
-            'bill_amt_sep', 'bill_amt_aug', 'bill_amt_jul', 'bill_amt_jun', 'bill_amt_may', 'bill_amt_apr',
-            'pay_amt_sep', 'pay_amt_aug', 'pay_amt_jul', 'pay_amt_jun', 'pay_amt_may', 'pay_amt_mar'
-        ]
         optional_field = ['Gender', 'education','age']
         print(request.form)  # Debugging line to check form data
         print("========== FORM DATA ==========")

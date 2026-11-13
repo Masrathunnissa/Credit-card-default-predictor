@@ -133,51 +133,26 @@ def train_model(df, X, y, output_model_dir):
         y (pd.Series): Target vector.
         output_model_dir (str): Directory to save the trained model.
     """
-    # Handling missing values (if any)
-    imputer = SimpleImputer(strategy='median')  # or strategy='mean'
-    X_imputed = imputer.fit_transform(X)
+    # Impute, then scale the raw training values once. The saved scaler must be
+    # the one applied to new form input, and the model must be fit on that output.
+    imputer = SimpleImputer(strategy='median')
+    X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
 
-    # Scale the features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_imputed)
-
-    # Split into training and testing datasets
     X_train, X_test, y_train, y_test = train_test_split(
-        X_scaled, y, test_size=0.2, random_state=42, stratify=y
+        X_imputed, y, test_size=0.2, random_state=42, stratify=y
     )
-
-    # Print final shapes
     print("Train shape:", X_train.shape)
     print("Test shape:", X_test.shape)
-    # -----------------------------
-    # ✅ Feature Scaling
+
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # -----------------------------
-    # ✅ Handling over sampling Class Imbalance with SMOTE    
-    smote = SMOTE(random_state=42)
-    X_train_resampled, y_train_resampled = smote.fit_resample(X_train_scaled, y_train)      
-    print("✅ Class imbalance handled with SMOTE.")
-    # -----------------------------
-    # ✅ Feature Selection using Random Forest  
-    selector = SelectFromModel(RandomForestClassifier(n_estimators=100, random_state=42))
-    selector.fit(X_train_resampled, y_train_resampled)
-    X_train_selected = selector.transform(X_train_resampled)
-    X_test_selected = selector.transform(X_test_scaled)
-    print("✅ Feature selection complete.")
-    # -----------------------------
-    # ✅ Model Training 
-    # model = RandomForestClassifier(n_estimators=100, random_state=42)
-    # model.fit(X_train_selected, y_train_resampled)  
-    # --- 3. Train Model ---
     model = LogisticRegression(max_iter=1000)
-    model.fit(X_train, y_train)
+    model.fit(X_train_scaled, y_train)
 
-    # --- 4. Predict Probabilities ---
-    y_probs = model.predict_proba(X_test)[:, 1]
-    y_preds = model.predict(X_test)
+    y_probs = model.predict_proba(X_test_scaled)[:, 1]
+    y_preds = model.predict(X_test_scaled)
 
     # ROC Curve + AUC
 
