@@ -88,14 +88,13 @@ def preprocess_data(df, credit_limit_threshold=300000, repayment_history_thresho
     low_limit = df['LIMIT_BAL'] < credit_limit_threshold
     some_delay = (df['PAY_0'] > repayment_history_threshold)
 
-    if 'default.payment.next.month' not in df.columns:
-    # Initialize the target variable with zeros
-        df['default.payment.next.month'] = 0
-    # Apply the rules to generate the target variable
-        df['default.payment.next.month'] = ((serious_delay) | (low_payment_ratio) | (low_limit & some_delay)).astype(int)
+    if "default" in df.columns:
+        pass
+    elif "default.payment.next.month" in df.columns:
+        df.rename(columns={"default.payment.next.month": "default"}, inplace=True)
+    else:
+        df["default"] = ((serious_delay) | (low_payment_ratio) | (low_limit & some_delay)).astype(int)
         print("Generated target variable:")
-
-    df.rename(columns={"default.payment.next.month": "default"}, inplace=True)
     print("✅ Preprocessing complete. Target variable 'default.payment.next.month' generated.")
 
     if df.isnull().values.any():

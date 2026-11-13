@@ -130,8 +130,11 @@ def train_and_save_model(data_path, save_dir="models"):
     ARCHIVE_DIR = "models/archive"
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
-    # Archive old models before saving new one
+    # Archive older models and leave the file just saved in place.
+    saved_name = os.path.basename(model_path)
     for file in os.listdir("models"):
+        if file == saved_name:
+            continue
         if file.startswith("credit_model") and file.endswith(".pkl"):
             os.rename(os.path.join("models", file), os.path.join(ARCHIVE_DIR, file))
 
